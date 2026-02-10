@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brain Facts - Deep Work Timer</title>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --text-primary: #24292f;
+            --text-secondary: #57606a;
+            --border-color: #d0d7de;
+            --accent-color: #0969da;
+            --circle-bg: #f6f8fa;
+            --segment-inactive: #e1e4e8;
+            --segment-active: #24292f;
+            --digital-display: #24292f;
+            --button-bg: #f6f8fa;
+            --button-hover: #e7eaed;
+            --shadow: rgba(27, 31, 36, 0.04);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --text-primary: #e6edf3;
+            --text-secondary: #7d8590;
+            --border-color: #30363d;
+            --accent-color: #2f81f7;
+            --circle-bg: #161b22;
+            --segment-inactive: #21262d;
+            --segment-active: #e6edf3;
+            --digital-display: #e6edf3;
+            --button-bg: #21262d;
+            --button-hover: #30363d;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: clamp(1rem, 2vw, 1.2rem);
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .mode-indicator {
+            display: inline-block;
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .mode-indicator.work {
+            color: var(--accent-color);
+        }
+
+        .mode-indicator.rest {
+            color: #1a7f37;
+        }
+
+        [data-theme="dark"] .mode-indicator.rest {
+            color: #3fb950;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--button-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px var(--shadow);
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            background: var(--button-hover);
+            transform: scale(1.05);
+        }
+
+        .timer-display {
+            display: flex;
+            gap: 60px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 50px;
+            flex-wrap: wrap;
+            padding: 0 20px;
+        }
+
+        .time-unit {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .circle-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin-bottom: 15px;
+        }
+
+        .circle-outer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            /* background: var(--circle-bg); */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* box-shadow: 0 2px 8px var(--shadow); */
+            /* border: 1px solid var(--border-color); */
+        }
+
+        .segments-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .segment {
+            position: absolute;
+            width: 10px;
+            height: 22px;
+            background: var(--segment-inactive);
+            border-radius: 5px;
+            transition: background 0.3s ease;
+
+            /* Centering */
+            left: 50%;
+            top: 50%;
+            margin-left: -5px;
+            margin-top: -11px;
+
+            /* Positioning ring */
+            --radius: -128px;
+            transform: rotate(var(--rotation)) translateY(var(--radius));
+        }
+
+        .segment.active {
+            background: var(--segment-active);
+        }
+
+        .digital-display {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Seven-segment display container */
+        .time-value {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Seven-segment digit */
+        .digit {
+            position: relative;
+            width: 50px;
+            height: 80px;
+            display: inline-block;
+        }
+
+        /* Seven-segment bars */
+        .segment-bar {
+            position: absolute;
+            background-color: var(--segment-inactive);
+            transition: background-color 0.3s ease;
+        }
+
+        .segment-bar.on {
+            background-color: var(--digital-display);
+        }
+
+        /* Horizontal segments */
+        .segment-a,
+        .segment-d,
+        .segment-g {
+            width: 40px;
+            height: 8px;
+            left: 5px;
+        }
+
+        .segment-a {
+            top: 0;
+        }
+
+        .segment-d {
+            bottom: 0;
+        }
+
+        .segment-g {
+            top: 36px;
+        }
+
+        /* Vertical segments */
+        .segment-b,
+        .segment-c,
+        .segment-e,
+        .segment-f {
+            width: 8px;
+            height: 32px;
+        }
+
+        .segment-b {
+            top: 4px;
+            right: 0;
+        }
+
+        .segment-c {
+            bottom: 4px;
+            right: 0;
+        }
+
+        .segment-e {
+            bottom: 4px;
+            left: 0;
+        }
+
+        .segment-f {
+            top: 4px;
+            left: 0;
+        }
+
+        .time-label {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 40px;
+        }
+
+        button {
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--button-bg);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px var(--shadow);
+            min-width: 130px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background: var(--button-hover);
+            border-color: var(--text-secondary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px var(--shadow);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.primary {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        button.primary:hover {
+            background: #0860ca;
+            border-color: #0860ca;
+        }
+
+        button.switch-mode {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border-color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        button.switch-mode:hover {
+            opacity: 0.9;
+        }
+
+        .stats {
+            margin-top: 50px;
+            padding: 25px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            text-align: center;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .stats h3 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .stats p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            margin: 8px 0;
+        }
+
+        .stats strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .timer-display {
+                gap: 40px;
+            }
+
+            .circle-container {
+                width: 240px;
+                height: 240px;
+            }
+
+            .segment {
+                width: 8px;
+                height: 18px;
+                margin-left: -4px;
+                margin-top: -9px;
+                --radius: -100px;
+            }
+
+            .digit {
+                width: 40px;
+                height: 64px;
+            }
+
+            .segment-a,
+            .segment-d,
+            .segment-g {
+                width: 32px;
+                height: 7px;
+                left: 4px;
+            }
+
+            .segment-b,
+            .segment-c,
+            .segment-e,
+            .segment-f {
+                width: 7px;
+                height: 26px;
+            }
+
+            .segment-g {
+                top: 28.5px;
+            }
+
+            .time-label {
+                font-size: 0.9rem;
+            }
+
+            button {
+                min-width: 110px;
+                padding: 12px 24px;
+                font-size: 0.95rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                margin-bottom: 30px;
+            }
+
+            .timer-display {
+                gap: 25px;
+            }
+
+            .circle-container {
+                width: 200px;
+                height: 200px;
+            }
+
+            .segment {
+                width: 7px;
+                height: 16px;
+                margin-left: -3.5px;
+                margin-top: -8px;
+                --radius: -80px;
+            }
+
+            .digit {
+                width: 35px;
+                height: 56px;
+            }
+
+            .segment-a,
+            .segment-d,
+            .segment-g {
+                width: 28px;
+                height: 6px;
+                left: 3.5px;
+            }
+
+            .segment-b,
+            .segment-c,
+            .segment-e,
+            .segment-f {
+                width: 6px;
+                height: 22px;
+            }
+
+            .segment-g {
+                top: 25px;
+            }
+
+            .time-label {
+                font-size: 0.8rem;
+            }
+
+            .controls {
+                gap: 10px;
+            }
+
+            button {
+                min-width: 100px;
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+
+            .stats {
+                padding: 20px;
+            }
+        }
+
+        /* Landscape mobile optimization */
+        @media (max-height: 600px) and (orientation: landscape) {
+            body {
+                padding: 15px;
+            }
+
+            header {
+                margin-bottom: 20px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .subtitle {
+                font-size: 0.9rem;
+            }
+
+            .timer-display {
+                gap: 35px;
+                margin-bottom: 25px;
+            }
+
+            .circle-container {
+                width: 180px;
+                height: 180px;
+            }
+
+            .segment {
+                width: 5px;
+                height: 14px;
+                margin-left: -2.5px;
+                margin-top: -7px;
+                --radius: -70px;
+            }
+
+            .digit {
+                width: 30px;
+                height: 48px;
+            }
+
+            .segment-a,
+            .segment-d,
+            .segment-g {
+                width: 24px;
+                height: 5px;
+                left: 3px;
+            }
+
+            .segment-b,
+            .segment-c,
+            .segment-e,
+            .segment-f {
+                width: 5px;
+                height: 19px;
+            }
+
+            .segment-g {
+                top: 21.5px;
+            }
+
+            .time-label {
+                font-size: 0.7rem;
+                margin-top: 5px;
+            }
+
+            .controls {
+                gap: 10px;
+                margin-top: 20px;
+            }
+
+            button {
+                padding: 8px 16px;
+                font-size: 0.85rem;
+                min-width: 90px;
+            }
+
+            .stats {
+                margin-top: 25px;
+                padding: 15px;
+            }
+
+            .mode-indicator {
+                padding: 6px 14px;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Alert message */
+        .alert {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 14px 28px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--text-primary);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px var(--shadow);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 1000;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .alert.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-icon">🌓</span>
+    </button>
+
+    <div class="container">
+        <header>
+            <!-- <h1>BRAIN FACTS</h1> -->
+            <p class="subtitle">Deep Work Timer</p>
+            <div class="mode-indicator" id="modeIndicator">
+                <span id="modeText">DEEP WORK</span> - <span id="modeTime">90:00</span>
+            </div>
+        </header>
+
+        <div class="timer-display">
+            <!-- Minutes Circle -->
+            <div class="time-unit">
+                <div class="circle-container">
+                    <div class="circle-outer">
+                        <div class="segments-container" id="minutesSegments"></div>
+                        <div class="digital-display">
+                            <div class="time-value" id="minutes"></div>
+                            <div class="time-label">MIN</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seconds Circle -->
+            <div class="time-unit">
+                <div class="circle-container">
+                    <div class="circle-outer">
+                        <div class="segments-container" id="secondsSegments"></div>
+                        <div class="digital-display">
+                            <div class="time-value" id="seconds"></div>
+                            <div class="time-label">SEC</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="primary" id="startPauseBtn" onclick="toggleTimer()">Start</button>
+            <button onclick="resetTimer()">Reset</button>
+            <button class="switch-mode" onclick="switchMode()">
+                Switch to <span id="switchModeText">REST</span>
+            </button>
+        </div>
+
+        <div class="stats">
+            <h3>Session Statistics</h3>
+            <p>Deep Work Sessions: <strong id="deepWorkSessions">0</strong></p>
+            <p>Rest Sessions: <strong id="restSessions">0</strong></p>
+            <p>Total Time: <strong id="totalTime">0h 0m</strong></p>
+        </div>
+    </div>
+
+    <div class="alert" id="alert"></div>
+
+    <script>
+        // Configuration
+        const DEEP_WORK_TIME = 90 * 60; // 90 minutes in seconds
+        const REST_TIME = 20 * 60; // 20 minutes in seconds
+        const SEGMENTS_COUNT = 60; // 60 segments around the circle
+
+        // Timer state
+        let isDeepWork = true;
+        let totalSeconds = DEEP_WORK_TIME;
+        let currentSeconds = totalSeconds;
+        let isRunning = false;
+        let timerInterval = null;
+        let deepWorkSessions = 0;
+        let restSessions = 0;
+        let totalMinutes = 0;
+
+        // Initialize segments
+        function createSegments(containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            for (let i = 0; i < SEGMENTS_COUNT; i++) {
+                const segment = document.createElement('div');
+                segment.className = 'segment';
+                const angle = (360 / SEGMENTS_COUNT) * i;
+                segment.style.setProperty('--rotation', `${angle}deg`);
+                container.appendChild(segment);
+            }
+        }
+
+        // Update segment states based on progress
+        function updateSegments(containerId, currentValue, maxValue) {
+            const container = document.getElementById(containerId);
+            const segments = container.children;
+            const activeCount = Math.ceil((currentValue / maxValue) * SEGMENTS_COUNT);
+
+            for (let i = 0; i < segments.length; i++) {
+                if (i < activeCount) {
+                    segments[i].classList.add('active');
+                } else {
+                    segments[i].classList.remove('active');
+                }
+            }
+        }
+
+        // Initialize timer
+        function init() {
+            createSegments('minutesSegments');
+            createSegments('secondsSegments');
+            loadStats();
+            updateDisplay();
+            updateModeIndicator();
+        }
+
+        function toggleTimer() {
+            isRunning = !isRunning;
+            const btn = document.getElementById('startPauseBtn');
+
+            if (isRunning) {
+                btn.textContent = 'Pause';
+                startTimer();
+            } else {
+                btn.textContent = 'Start';
+                stopTimer();
+            }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                if (currentSeconds > 0) {
+                    currentSeconds--;
+                    updateDisplay();
+                } else {
+                    completeSession();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function resetTimer() {
+            stopTimer();
+            isRunning = false;
+            currentSeconds = totalSeconds;
+            document.getElementById('startPauseBtn').textContent = 'Start';
+            updateDisplay();
+        }
+
+        function switchMode() {
+            stopTimer();
+            isRunning = false;
+            isDeepWork = !isDeepWork;
+            totalSeconds = isDeepWork ? DEEP_WORK_TIME : REST_TIME;
+            currentSeconds = totalSeconds;
+
+            updateModeIndicator();
+            updateDisplay();
+            document.getElementById('startPauseBtn').textContent = 'Start';
+
+            showAlert(`Switched to ${isDeepWork ? 'DEEP WORK (90 min)' : 'REST (20 min)'} mode`);
+        }
+
+        function completeSession() {
+            stopTimer();
+            isRunning = false;
+
+            // Track session
+            if (isDeepWork) {
+                deepWorkSessions++;
+                totalMinutes += 90;
+            } else {
+                restSessions++;
+                totalMinutes += 20;
+            }
+
+            saveStats();
+
+            // Auto-switch to next mode
+            isDeepWork = !isDeepWork;
+            totalSeconds = isDeepWork ? DEEP_WORK_TIME : REST_TIME;
+            currentSeconds = totalSeconds;
+
+            updateModeIndicator();
+            updateDisplay();
+            updateStats();
+            document.getElementById('startPauseBtn').textContent = 'Start';
+
+            const message = isDeepWork
+                ? '🎉 Rest complete! Ready for Deep Work?'
+                : '✅ Deep Work complete! Time to rest!';
+
+            showAlert(message);
+
+            // Browser notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('BRAIN FACTS Timer', {
+                    body: message,
+                    icon: '🧠'
+                });
+            }
+        }
+
+        function updateDisplay() {
+            const minutes = Math.floor(currentSeconds / 60);
+            const seconds = currentSeconds % 60;
+
+            // Update digital display with seven-segment
+            renderSevenSegment('minutes', minutes);
+            renderSevenSegment('seconds', seconds);
+
+            // Update segments
+            const totalMinutes = Math.floor(totalSeconds / 60);
+            updateSegments('minutesSegments', minutes, totalMinutes);
+            updateSegments('secondsSegments', seconds, 60);
+        }
+
+        // Seven-segment digit patterns
+        const segmentPatterns = {
+            '0': ['a', 'b', 'c', 'd', 'e', 'f'],
+            '1': ['b', 'c'],
+            '2': ['a', 'b', 'd', 'e', 'g'],
+            '3': ['a', 'b', 'c', 'd', 'g'],
+            '4': ['b', 'c', 'f', 'g'],
+            '5': ['a', 'c', 'd', 'f', 'g'],
+            '6': ['a', 'c', 'd', 'e', 'f', 'g'],
+            '7': ['a', 'b', 'c'],
+            '8': ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+            '9': ['a', 'b', 'c', 'd', 'f', 'g']
+        };
+
+        function renderSevenSegment(elementId, value) {
+            const container = document.getElementById(elementId);
+            const digits = String(value).padStart(2, '0').split('');
+
+            container.innerHTML = digits.map(digit => {
+                const activeSegments = segmentPatterns[digit] || [];
+                return `
+                    <div class="digit">
+                        <div class="segment-bar segment-a ${activeSegments.includes('a') ? 'on' : ''}"></div>
+                        <div class="segment-bar segment-b ${activeSegments.includes('b') ? 'on' : ''}"></div>
+                        <div class="segment-bar segment-c ${activeSegments.includes('c') ? 'on' : ''}"></div>
+                        <div class="segment-bar segment-d ${activeSegments.includes('d') ? 'on' : ''}"></div>
+                        <div class="segment-bar segment-e ${activeSegments.includes('e') ? 'on' : ''}"></div>
+                        <div class="segment-bar segment-f ${activeSegments.includes('f') ? 'on' : ''}"></div>
+                        <div class="segment-bar segment-g ${activeSegments.includes('g') ? 'on' : ''}"></div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateModeIndicator() {
+            const indicator = document.getElementById('modeIndicator');
+            const modeText = document.getElementById('modeText');
+            const modeTime = document.getElementById('modeTime');
+            const switchModeText = document.getElementById('switchModeText');
+
+            if (isDeepWork) {
+                modeText.textContent = 'DEEP WORK';
+                modeTime.textContent = '90:00';
+                indicator.className = 'mode-indicator work';
+                switchModeText.textContent = 'REST';
+            } else {
+                modeText.textContent = 'REST';
+                modeTime.textContent = '20:00';
+                indicator.className = 'mode-indicator rest';
+                switchModeText.textContent = 'DEEP WORK';
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('deepWorkSessions').textContent = deepWorkSessions;
+            document.getElementById('restSessions').textContent = restSessions;
+
+            const hours = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+            document.getElementById('totalTime').textContent = `${hours}h ${mins}m`;
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        function showAlert(message) {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.classList.add('show');
+
+            setTimeout(() => {
+                alert.classList.remove('show');
+            }, 3500);
+        }
+
+        function saveStats() {
+            localStorage.setItem('deepWorkSessions', deepWorkSessions);
+            localStorage.setItem('restSessions', restSessions);
+            localStorage.setItem('totalMinutes', totalMinutes);
+        }
+
+        function loadStats() {
+            deepWorkSessions = parseInt(localStorage.getItem('deepWorkSessions') || '0');
+            restSessions = parseInt(localStorage.getItem('restSessions') || '0');
+            totalMinutes = parseInt(localStorage.getItem('totalMinutes') || '0');
+            updateStats();
+        }
+
+        // Load theme preference
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+        // Prevent sleep during active timer
+        let wakeLock = null;
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator && isRunning) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.log('Wake Lock not available');
+                }
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', init);
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && wakeLock) {
+                wakeLock.release();
+                wakeLock = null;
+            } else if (!document.hidden && isRunning) {
+                requestWakeLock();
+            }
+        });
+    </script>
+</body>
+
+</html>
